@@ -1,5 +1,11 @@
 import 'dart:async';
 import 'dart:core';
+import 'dart:io';
+
+import 'package:path_provider/path_provider.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:share_plus/share_plus.dart';
 
 import 'package:flutter/material.dart';
 
@@ -82,11 +88,45 @@ class InvoiceSenderState extends State<InvoiceSender> {
   // End the current Activity
   void endActivity() {
     // Add the activity to the list of activites and use the duration
-    print(duration.inMinutes);
-    print(myController.text);
-    final activity = Activity(myController.text, duration);
-    list.add(activity);
-    resetTimer();
+    if (duration.inSeconds > 0 && myController.text != "") {
+      final activity = Activity(myController.text, duration);
+      list.add(activity);
+      resetTimer();
+    }
+  }
+
+  // Generate a PDF
+  Future<void> generatePDF() async {
+    final pdf = pw.Document();
+    pdf.addPage(pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context context) {
+          return pw.Center(
+              child: pw.Text('Invoice',
+                  style: pw.TextStyle(
+                      fontSize: 24, fontWeight: pw.FontWeight.bold)));
+        }));
+    pdf.addPage(pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context context) {
+          return pw.Table.fromTextArray(
+            cellAlignment: pw.Alignment.center,
+            data: List<List<String>>.generate(
+              list.length,
+              (row) => List<String>.generate(
+                2,
+                (col) => col == 0
+                    ? '${list[row].description}'
+                    : '${list[row].duration}',
+              ),
+            ),
+          );
+        }));
+    Directory tempDir = await getTemporaryDirectory();
+    String tempPath = tempDir.path;
+    final file = File("${tempPath}/invoice.pdf");
+    await file.writeAsBytes(await pdf.save());
+    Share.shareFiles([file.path], text: 'Invoice');
   }
 
   String twoDigits(int n) => n.toString().padLeft(2, '0');
@@ -94,62 +134,70 @@ class InvoiceSenderState extends State<InvoiceSender> {
   Widget _buildUI() {
     final minutes = twoDigits(duration.inMinutes.remainder(60));
     final seconds = twoDigits(duration.inSeconds.remainder(60));
-    return Card(
-      child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 200,
+    return Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              SizedBox(
+                width: 250,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
                   child: TextField(
                     controller: myController,
                     decoration: const InputDecoration(
-                      border: UnderlineInputBorder(),
+                      border: OutlineInputBorder(),
                       hintText: 'What did you work on?',
                     ),
                   ),
                 ),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.all(25.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '$minutes:$seconds',
+              ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.all(25.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                Text(
+                  '$minutes:$seconds',
+                  style: const TextStyle(
+                      fontSize: 48, fontWeight: FontWeight.bold),
+                ),
+                TextButton(
+                  onPressed: () {
+                    toggleTimer();
+                  },
+                  child: Text(
+                    running ? "Pause" : "Start",
                     style: const TextStyle(
                         fontSize: 48, fontWeight: FontWeight.bold),
                   ),
-                  TextButton(
-                    onPressed: () {
-                      toggleTimer();
-                    },
-                    child: Text(
-                      running ? "Pause" : "Start",
-                      style: const TextStyle(
-                          fontSize: 48, fontWeight: FontWeight.bold),
-                    ),
-                  )
-                ],
-              ),
+                )
+              ],
             ),
-            TextButton(
-              onPressed: () {
-                endActivity();
-              },
-              child: const Text(
-                "End Activity",
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-            )
-          ]),
-    );
+          ),
+          TextButton(
+            onPressed: () {
+              endActivity();
+            },
+            child: const Text(
+              "End Activity",
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              generatePDF();
+            },
+            child: const Text(
+              "Export PDF",
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+          )
+        ]);
   }
 
   @override
@@ -160,6 +208,7 @@ class InvoiceSenderState extends State<InvoiceSender> {
           mainAxisSize: MainAxisSize.max,
           children: [
             Center(child: _buildUI()),
+            const Divider(),
             Expanded(
                 child: ListView.builder(
                     itemCount: list.length,
