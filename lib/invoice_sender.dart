@@ -8,10 +8,11 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
 
 import 'package:flutter/material.dart';
+import 'package:stop_watch_timer/stop_watch_timer.dart';
 
 class Activity {
   String? description;
-  Duration? duration;
+  String? duration;
 
   Activity(this.description, this.duration);
 }
@@ -23,10 +24,9 @@ class InvoiceSender extends StatefulWidget {
 
 class InvoiceSenderState extends State<InvoiceSender> {
   List<Activity> list = [];
-  Duration duration = Duration();
-  Timer? timer;
-  bool running = false;
   final TextEditingController myController = TextEditingController();
+  final StopWatchTimer _stopWatchTimer = StopWatchTimer(); // Create instance.
+  var running = false;
 
   // Executed when the widget is added to the widget tree
   @override
@@ -36,63 +36,37 @@ class InvoiceSenderState extends State<InvoiceSender> {
 
   // Executed when the widget is removed from the widget tree
   @override
-  void dispose() {
-    myController.dispose();
+  void dispose() async {
+    await _stopWatchTimer.dispose();
     super.dispose();
-  }
-
-  // Incrementing the counter by 1 second
-  void addTime() {
-    const addSeconds = 1;
-    setState(() {
-      final seconds = duration.inSeconds + addSeconds;
-      duration = Duration(seconds: seconds);
-    });
   }
 
   // Start the timer
   void startTimer() {
+    _stopWatchTimer.onExecute.add(StopWatchExecute.start);
     setState(() {
-      running = true;
+      running = !_stopWatchTimer.isRunning;
     });
-    timer = Timer.periodic(const Duration(seconds: 1), (_) => addTime());
   }
 
   // Stop the timer (can be resumed)
   void stopTimer() {
+    _stopWatchTimer.onExecute.add(StopWatchExecute.stop);
     setState(() {
-      running = false;
-    });
-    timer?.cancel();
-  }
-
-  // Wrapper around start and stop to toggle
-  void toggleTimer() {
-    if (running) {
-      stopTimer();
-    } else {
-      startTimer();
-    }
-  }
-
-  // Used to reset the timer
-  void resetTimer() {
-    stopTimer();
-    setState(() {
-      duration = Duration();
-      running = false;
-      myController.text = "";
+      running = !_stopWatchTimer.isRunning;
     });
   }
 
   // End the current Activity
   void endActivity() {
-    // Add the activity to the list of activites and use the duration
-    if (duration.inSeconds > 0 && myController.text != "") {
-      final activity = Activity(myController.text, duration);
-      list.add(activity);
-      resetTimer();
-    }
+    final value = _stopWatchTimer.rawTime.value;
+    final displayTime = StopWatchTimer.getDisplayTime(value, hours: true);
+    final newActivity = Activity(myController.text, displayTime);
+    _stopWatchTimer.onExecute.add(StopWatchExecute.reset);
+    setState(() {
+      list.add(newActivity);
+      myController.text = "";
+    });
   }
 
   // Generate a PDF
@@ -129,11 +103,7 @@ class InvoiceSenderState extends State<InvoiceSender> {
     Share.shareFiles([file.path], text: 'Invoice');
   }
 
-  String twoDigits(int n) => n.toString().padLeft(2, '0');
-
   Widget _buildUI() {
-    final minutes = twoDigits(duration.inMinutes.remainder(60));
-    final seconds = twoDigits(duration.inSeconds.remainder(60));
     return Column(
         mainAxisAlignment: MainAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
@@ -161,14 +131,42 @@ class InvoiceSenderState extends State<InvoiceSender> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                Text(
-                  '$minutes:$seconds',
-                  style: const TextStyle(
-                      fontSize: 48, fontWeight: FontWeight.bold),
+                StreamBuilder<int>(
+                  stream: _stopWatchTimer.rawTime,
+                  initialData: _stopWatchTimer.rawTime.value,
+                  builder: (context, snap) {
+                    final value = snap.data!;
+                    final displayTime =
+                        StopWatchTimer.getDisplayTime(value, hours: true);
+
+                    return Column(
+                      children: <Widget>[
+                        Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: <Widget>[
+                                Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(horizontal: 4),
+                                  child: Text(
+                                    displayTime.toString(),
+                                    style: const TextStyle(
+                                        fontSize: 30,
+                                        fontFamily: 'Helvetica',
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ],
+                            )),
+                      ],
+                    );
+                  },
                 ),
                 TextButton(
                   onPressed: () {
-                    toggleTimer();
+                    _stopWatchTimer.isRunning ? stopTimer() : startTimer();
                   },
                   child: Text(
                     running ? "Pause" : "Start",
@@ -179,24 +177,27 @@ class InvoiceSenderState extends State<InvoiceSender> {
               ],
             ),
           ),
-          TextButton(
-            onPressed: () {
-              endActivity();
-            },
-            child: const Text(
-              "End Activity",
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              TextButton(
+                onPressed: () {
+                  endActivity();
+                },
+                child: const Text(
+                  "End Activity",
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                ),
+              ),
+              IconButton(
+                onPressed: () {
+                  generatePDF();
+                },
+                icon: const Icon(Icons.share),
+                color: Colors.blue,
+              )
+            ],
           ),
-          TextButton(
-            onPressed: () {
-              generatePDF();
-            },
-            child: const Text(
-              "Export PDF",
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-          )
         ]);
   }
 

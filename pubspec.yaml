@@ -37,6 +37,7 @@ dependencies:
   pdf: ^3.8.1
   share_plus: ^4.0.9
   path_provider: ^2.0.11
+  stop_watch_timer: ^1.5.0
 
 dev_dependencies:
   flutter_test:
