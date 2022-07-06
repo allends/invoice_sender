@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:core';
 import 'dart:io';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:invoice_sender/main.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -10,23 +12,17 @@ import 'package:share_plus/share_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:stop_watch_timer/stop_watch_timer.dart';
 
-class Activity {
-  String? description;
-  String? duration;
+class InvoiceSender extends ConsumerStatefulWidget {
+  const InvoiceSender({Key? key}) : super(key: key);
 
-  Activity(this.description, this.duration);
-}
-
-class InvoiceSender extends StatefulWidget {
   @override
   InvoiceSenderState createState() => InvoiceSenderState();
 }
 
-class InvoiceSenderState extends State<InvoiceSender> {
+class InvoiceSenderState extends ConsumerState<InvoiceSender> {
   List<Activity> list = [];
   final TextEditingController myController = TextEditingController();
   final StopWatchTimer _stopWatchTimer = StopWatchTimer(); // Create instance.
-  var running = false;
 
   // Executed when the widget is added to the widget tree
   @override
@@ -37,24 +33,21 @@ class InvoiceSenderState extends State<InvoiceSender> {
   // Executed when the widget is removed from the widget tree
   @override
   void dispose() async {
-    await _stopWatchTimer.dispose();
     super.dispose();
+    ref.read(runningProvider);
+    await _stopWatchTimer.dispose();
   }
 
   // Start the timer
   void startTimer() {
     _stopWatchTimer.onExecute.add(StopWatchExecute.start);
-    setState(() {
-      running = !_stopWatchTimer.isRunning;
-    });
+    ref.read(runningProvider.notifier).update((state) => true);
   }
 
   // Stop the timer (can be resumed)
   void stopTimer() {
     _stopWatchTimer.onExecute.add(StopWatchExecute.stop);
-    setState(() {
-      running = !_stopWatchTimer.isRunning;
-    });
+    ref.read(runningProvider.notifier).update((state) => false);
   }
 
   // End the current Activity
@@ -63,6 +56,7 @@ class InvoiceSenderState extends State<InvoiceSender> {
     final displayTime = StopWatchTimer.getDisplayTime(value, hours: true);
     final newActivity = Activity(myController.text, displayTime);
     _stopWatchTimer.onExecute.add(StopWatchExecute.reset);
+    ref.read(runningProvider.notifier).update((state) => false);
     setState(() {
       list.add(newActivity);
       myController.text = "";
@@ -104,6 +98,7 @@ class InvoiceSenderState extends State<InvoiceSender> {
   }
 
   Widget _buildUI() {
+    final running = ref.watch(runningProvider);
     return Column(
         mainAxisAlignment: MainAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
@@ -166,7 +161,7 @@ class InvoiceSenderState extends State<InvoiceSender> {
                 ),
                 TextButton(
                   onPressed: () {
-                    _stopWatchTimer.isRunning ? stopTimer() : startTimer();
+                    running ? stopTimer() : startTimer();
                   },
                   child: Text(
                     running ? "Pause" : "Start",
@@ -203,21 +198,19 @@ class InvoiceSenderState extends State<InvoiceSender> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-        appBar: AppBar(title: const Text("Invoice Demo")),
-        body: Column(
-          mainAxisSize: MainAxisSize.max,
-          children: [
-            Center(child: _buildUI()),
-            const Divider(),
-            Expanded(
-                child: ListView.builder(
-                    itemCount: list.length,
-                    itemBuilder: (_, index) => ListTile(
-                          title: Text('${list[index].description}'),
-                          trailing: Text('${list[index].duration}'),
-                        )))
-          ],
-        ));
+    return Column(
+      mainAxisSize: MainAxisSize.max,
+      children: [
+        Center(child: _buildUI()),
+        const Divider(),
+        Expanded(
+            child: ListView.builder(
+                itemCount: list.length,
+                itemBuilder: (_, index) => ListTile(
+                      title: Text('${list[index].description}'),
+                      trailing: Text('${list[index].duration}'),
+                    )))
+      ],
+    );
   }
 }
