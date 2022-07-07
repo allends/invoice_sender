@@ -27,7 +27,10 @@ class PagesState extends ConsumerState<Pages> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Invoice Demo")),
+      appBar: AppBar(
+        title: const Text("Invoice Demo"),
+        elevation: 0,
+      ),
       bottomNavigationBar: BottomNavigationBar(
         items: const [
           BottomNavigationBarItem(
@@ -45,10 +48,8 @@ class PagesState extends ConsumerState<Pages> {
       floatingActionButton: FloatingActionButton(
         onPressed: () =>
             {ref.read(runningProvider.notifier).update((state) => !state)},
-        tooltip: 'Start Timer',
-        child: ref.watch(runningProvider)
-            ? const Icon(Icons.pause)
-            : const Icon(Icons.play_arrow),
+        tooltip: 'Export Invoice',
+        child: const Icon(Icons.share),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       body: IndexedStack(

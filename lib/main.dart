@@ -5,16 +5,24 @@ import './invoice_sender.dart';
 import './pages.dart';
 
 final runningProvider = StateProvider((_) => false);
-final personalInfoProvider =
-    StateProvider((_) => PersonalInfo("Allen", "", "", ""));
+final personalInfoProvider = StateProvider((_) => PersonalInfo("", "", "", ""));
+final clientProvider = StateNotifierProvider<ClientStateNotifier, List<Client>>(
+    (ref) => ClientStateNotifier());
 
 class PersonalInfo {
-  String firstName = "";
-  String lastName = "";
-  String number = "";
-  String venmo = "";
+  String firstName;
+  String lastName;
+  String number;
+  String venmo;
 
   PersonalInfo(this.firstName, this.lastName, this.number, this.venmo);
+}
+
+class Client extends PersonalInfo {
+  List<Activity> invoiceList = [];
+
+  Client(super.firstName, super.lastName, super.number, super.venmo,
+      this.invoiceList);
 }
 
 class Activity {
@@ -24,19 +32,30 @@ class Activity {
   Activity(this.description, this.duration);
 }
 
-class Client {
-  String firstName;
-  String lastName;
-  String number;
-
-  Client(this.firstName, this.lastName, this.number);
-}
-
 class ClientStateNotifier extends StateNotifier<List<Client>> {
-  ClientStateNotifier() : super([]);
+  ClientStateNotifier()
+      : super([Client("firstName", "lastName", "number", "venmo", [])]);
 
   void add(Client client) {
     state = [...state, client];
+  }
+
+  void add_activity(Client client, Activity activity) {
+    state = [
+      for (final current in state)
+        if (client != current)
+          current
+        else
+          Client(client.firstName, client.lastName, client.number, client.venmo,
+              [...client.invoiceList, activity]),
+    ];
+  }
+
+  List<Activity> getActivities(Client client) {
+    for (final current in state) {
+      if (current == client) return current.invoiceList;
+    }
+    return [];
   }
 
   void remove(Client client) {
@@ -47,10 +66,8 @@ class ClientStateNotifier extends StateNotifier<List<Client>> {
   }
 }
 
-final ClientProvider = StateNotifierProvider((ref) => ClientStateNotifier());
-
 void main() {
-  runApp(ProviderScope(child: const MyApp()));
+  runApp(const ProviderScope(child: MyApp()));
 }
 
 class MyApp extends ConsumerWidget {
@@ -62,7 +79,7 @@ class MyApp extends ConsumerWidget {
     return MaterialApp(
       title: 'Invoice Demo',
       theme: ThemeData(
-        primarySwatch: Colors.lightBlue,
+        primarySwatch: Colors.lightGreen,
       ),
       home: const Pages(),
     );

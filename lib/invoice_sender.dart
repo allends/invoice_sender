@@ -64,6 +64,12 @@ class InvoiceSenderState extends ConsumerState<InvoiceSender> {
   }
 
   // Generate a PDF
+  // Get the current selected user's info
+  // name
+  // number
+  // venmo
+  // list of billable activities
+  // Generate the PDF based on those values https://www.youtube.com/watch?v=z_5xkhEkc5Y
   Future<void> generatePDF() async {
     final pdf = pw.Document();
     pdf.addPage(pw.Page(
@@ -99,6 +105,8 @@ class InvoiceSenderState extends ConsumerState<InvoiceSender> {
 
   Widget _buildUI() {
     final running = ref.watch(runningProvider);
+    final clients = ref.watch(clientProvider);
+    String selected = clients.first.firstName;
     return Column(
         mainAxisAlignment: MainAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
@@ -159,14 +167,14 @@ class InvoiceSenderState extends ConsumerState<InvoiceSender> {
                     );
                   },
                 ),
-                TextButton(
+                OutlinedButton(
                   onPressed: () {
                     running ? stopTimer() : startTimer();
                   },
                   child: Text(
                     running ? "Pause" : "Start",
                     style: const TextStyle(
-                        fontSize: 48, fontWeight: FontWeight.bold),
+                        fontSize: 24, fontWeight: FontWeight.bold),
                   ),
                 )
               ],
@@ -188,11 +196,27 @@ class InvoiceSenderState extends ConsumerState<InvoiceSender> {
                 onPressed: () {
                   generatePDF();
                 },
-                icon: const Icon(Icons.share),
-                color: Colors.blue,
+                icon: Icon(
+                  Icons.share,
+                  color: Theme.of(context).primaryColor,
+                ),
               )
             ],
           ),
+          DropdownButton<String>(
+              value: selected,
+              items: ref
+                  .watch(clientProvider)
+                  .map((e) => DropdownMenuItem<String>(
+                        value: e.firstName,
+                        child: Text(e.firstName),
+                      ))
+                  .toList(),
+              onChanged: (newValue) {
+                setState(() {
+                  selected = newValue!;
+                });
+              }),
         ]);
   }
 
@@ -207,8 +231,8 @@ class InvoiceSenderState extends ConsumerState<InvoiceSender> {
             child: ListView.builder(
                 itemCount: list.length,
                 itemBuilder: (_, index) => ListTile(
-                      title: Text('${list[index].description}'),
-                      trailing: Text('${list[index].duration}'),
+                      title: Text(list[index].description),
+                      trailing: Text(list[index].duration),
                     )))
       ],
     );
